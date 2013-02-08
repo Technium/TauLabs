@@ -214,6 +214,52 @@ openocd_win_clean:
 	$(V0) @echo " CLEAN        $(OPENOCD_WIN_DIR)"
 	$(V1) [ ! -d "$(OPENOCD_WIN_DIR)" ] || $(RM) -r "$(OPENOCD_WIN_DIR)"
 
+.PHONY: openocd_git_install_without_ftdi
+
+openocd_git_install_without_ftdi: | $(DL_DIR) $(TOOLS_DIR)
+openocd_git_install_without_ftdi: OPENOCD_URL     := git://git.code.sf.net/p/openocd/code
+openocd_git_install_without_ftdi: OPENOCD_REV     := cf1418e9a85013bbf8dbcc2d2e9985695993d9f4
+openocd_git_install_without_ftdi: OPENOCD_OPTIONS := --enable-maintainer-mode --prefix="$(OPENOCD_DIR)" --enable-buspirate --enable-stlink
+
+ifeq ($(UNAME), Darwin)
+openocd_git_install_without_ftdi: OPENOCD_OPTIONS := $(OPENOCD_OPTIONS) --disable-option-checking
+endif
+
+openocd_git_install_without_ftdi: openocd_clean
+
+
+        # download the source
+	$(V0) @echo " DOWNLOAD     $(OPENOCD_URL) @ $(OPENOCD_REV)"
+	$(V1) [ ! -d "$(OPENOCD_BUILD_DIR)" ] || $(RM) -rf "$(OPENOCD_BUILD_DIR)"
+	$(V1) mkdir -p "$(OPENOCD_BUILD_DIR)"
+	$(V1) git clone --no-checkout $(OPENOCD_URL) "$(OPENOCD_BUILD_DIR)"
+	$(V1) ( \
+	  cd $(OPENOCD_BUILD_DIR) ; \
+	  git checkout -q $(OPENOCD_REV) ; \
+	)
+
+        # apply patches
+	$(V0) @echo " PATCH        $(OPENOCD_DIR)"
+	$(V1) ( \
+	  cd $(OPENOCD_BUILD_DIR) ; \
+	  git apply < $(ROOT_DIR)/flight/Project/OpenOCD/0003-freertos-cm4f-fpu-support.patch ; \
+	)
+
+        # build and install
+	$(V0) @echo " BUILD        $(OPENOCD_DIR)"
+	$(V1) mkdir -p "$(OPENOCD_DIR)"
+	$(V1) ( \
+	  cd $(OPENOCD_BUILD_DIR) ; \
+	  ./bootstrap ; \
+	  ./configure  $(OPENOCD_OPTIONS) ; \
+	  $(MAKE) ; \
+	  $(MAKE) install ; \
+	)
+
+        # delete the extracted source when we're done
+	$(V1) [ ! -d "$(OPENOCD_BUILD_DIR)" ] || $(RM) -rf "$(OPENOCD_BUILD_DIR)"
+
+
 .PHONY: openocd_git_install
 
 openocd_git_install: | $(DL_DIR) $(TOOLS_DIR)
